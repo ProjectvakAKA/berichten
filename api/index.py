@@ -46,7 +46,7 @@ security = HTTPBearer(auto_error=False)
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    email: Optional[EmailStr] = None
+    email: EmailStr  # Email is verplicht
 
 class LoginRequest(BaseModel):
     username: str
@@ -55,12 +55,16 @@ class LoginRequest(BaseModel):
 class Message(BaseModel):
     content: str
 
+class MessageUpdate(BaseModel):
+    content: str
+
 class MessageResponse(BaseModel):
     id: str
     content: str
     username: str
     color: str
     timestamp: str
+    edited: Optional[bool] = False
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -101,13 +105,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # Routes
 @app.get("/")
 async def root():
-    return {"status": "FlowChat API is running", "auth": "enabled"}
+    return {"status": "FlowChat Pro API is running", "version": "2.0", "auth": "enabled"}
 
 @app.post("/api/register")
 async def register(request: RegisterRequest):
     """Registreer nieuwe gebruiker"""
     username = request.username.strip()
     password = request.password
+    email = request.email
     
     if not username or len(username) < 3:
         raise HTTPException(
@@ -128,11 +133,11 @@ async def register(request: RegisterRequest):
             detail="Gebruikersnaam is al in gebruik"
         )
     
-    # Supabase auth (indien beschikbaar)
-    if supabase and request.email:
+    # Supabase auth
+    if supabase:
         try:
             response = supabase.auth.sign_up({
-                "email": request.email,
+                "email": email,
                 "password": password,
                 "options": {
                     "data": {
@@ -141,7 +146,8 @@ async def register(request: RegisterRequest):
                 }
             })
         except Exception as e:
-            pass  # Fallback naar lokale auth
+            # Fallback naar lokale auth als Supabase faalt
+            pass
     
     # Maak gebruiker aan
     password_hash = hash_password(password)
@@ -151,6 +157,7 @@ async def register(request: RegisterRequest):
     users_store[username] = {
         "password_hash": password_hash,
         "color": color,
+        "email": email,
         "created_at": datetime.now().isoformat()
     }
     
@@ -223,8 +230,8 @@ async def send_message(message: Message, username: str = Depends(get_current_use
     if not message.content or len(message.content.strip()) == 0:
         raise HTTPException(status_code=400, detail="Bericht mag niet leeg zijn")
     
-    if len(message.content) > 500:
-        raise HTTPException(status_code=400, detail="Bericht mag maximaal 500 karakters zijn")
+    if len(message.content) > 2000:
+        raise HTTPException(status_code=400, detail="Bericht mag maximaal 2000 karakters zijn")
     
     msg_id = str(uuid.uuid4())
     user_color = users_store.get(username, {}).get("color", "#6C757D")
@@ -234,7 +241,8 @@ async def send_message(message: Message, username: str = Depends(get_current_use
         "content": message.content.strip(),
         "username": username,
         "color": user_color,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "edited": False
     }
     
     # Supabase storage (primary)
@@ -302,6 +310,69 @@ async def get_messages(since: Optional[str] = None, username: str = Depends(get_
             raise HTTPException(status_code=400, detail="Invalid timestamp format")
     
     return {"messages": messages_store}
+
+@app.put("/api/messages/{message_id}")
+async def update_message(
+    message_id: str, 
+    update: MessageUpdate, 
+    username: str = Depends(get_current_user)
+):
+    """Edit een bericht (alleen eigen berichten)"""
+    # Find message
+    message = next((m for m in messages_store if m["id"] == message_id), None)
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Check ownership
+    if message["username"] != username:
+        raise HTTPException(status_code=403, detail="You can only edit your own messages")
+    
+    # Update message
+    message["content"] = update.content.strip()
+    message["edited"] = True
+    message["edited_at"] = datetime.now().isoformat()
+    
+    # Update in Supabase if available
+    if supabase:
+        try:
+            supabase.table("messages")\
+                .update({
+                    "content": message["content"],
+                    "edited": True,
+                    "edited_at": message["edited_at"]
+                })\
+                .eq("id", message_id)\
+                .execute()
+        except Exception as e:
+            print(f"Supabase update error: {e}")
+    
+    return message
+
+@app.delete("/api/messages/{message_id}")
+async def delete_message(message_id: str, username: str = Depends(get_current_user)):
+    """Delete een bericht (alleen eigen berichten)"""
+    # Find message
+    message = next((m for m in messages_store if m["id"] == message_id), None)
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Check ownership
+    if message["username"] != username:
+        raise HTTPException(status_code=403, detail="You can only delete your own messages")
+    
+    # Remove from store
+    messages_store.remove(message)
+    
+    # Delete from Supabase if available
+    if supabase:
+        try:
+            supabase.table("messages").delete().eq("id", message_id).execute()
+        except Exception as e:
+            print(f"Supabase delete error: {e}")
+    
+    return {"message": "Message deleted successfully"}
 
 @app.get("/api/users")
 async def get_users(username: str = Depends(get_current_user)):
