@@ -4,7 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="094532b1-7ec0-4c8f-a657-0b66fb19ada9" name="Changes" comment="eerste update" />
+    <list default="true" id="094532b1-7ec0-4c8f-a657-0b66fb19ada9" name="Changes" comment="eerste update">
+      <change beforePath="$PROJECT_DIR$/flowchat/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/api/index.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/public/app.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/public/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/public/styles.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/runtime.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/flowchat/vercel.json" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -82,7 +92,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770556478183</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="eerste update">
+      <option name="closed" value="true" />
+      <created>1770557058582</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1770557058582</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
