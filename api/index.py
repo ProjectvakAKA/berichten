@@ -3,11 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 import uuid
 import os
-from supabase import create_client, Client
-from mangum import Mangum
 import hashlib
 import secrets
 
@@ -27,12 +25,13 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 # Initialiseer Supabase client (optioneel)
-supabase: Optional[Client] = None
+supabase = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
+        from supabase import create_client
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except:
-        pass
+    except Exception as e:
+        print(f"Supabase init failed: {e}")
 
 # In-memory storage (fallback als Supabase niet is ingesteld)
 messages_store = []
@@ -46,7 +45,7 @@ security = HTTPBearer(auto_error=False)
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    email: EmailStr  # Email is verplicht
+    email: EmailStr
 
 class LoginRequest(BaseModel):
     username: str
@@ -68,7 +67,7 @@ class MessageResponse(BaseModel):
 
 # Helper functions
 def hash_password(password: str) -> str:
-    """Simple password hashing (gebruik bcrypt voor productie)"""
+    """Simple password hashing"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def generate_token() -> str:
@@ -146,8 +145,7 @@ async def register(request: RegisterRequest):
                 }
             })
         except Exception as e:
-            # Fallback naar lokale auth als Supabase faalt
-            pass
+            print(f"Supabase auth failed: {e}")
     
     # Maak gebruiker aan
     password_hash = hash_password(password)
@@ -249,19 +247,16 @@ async def send_message(message: Message, username: str = Depends(get_current_use
     if supabase:
         try:
             response = supabase.table("messages").insert(new_message).execute()
-            # If Supabase succeeds, also update in-memory for quick access
             messages_store.append(new_message)
             if len(messages_store) > 100:
                 messages_store.pop(0)
             return new_message
         except Exception as e:
-            # Log error but continue with in-memory storage
             print(f"Supabase insert error: {e}")
     
     # Fallback to in-memory storage
     messages_store.append(new_message)
     
-    # Beperk tot laatste 100 berichten
     if len(messages_store) > 100:
         messages_store.pop(0)
     
@@ -289,13 +284,11 @@ async def get_messages(since: Optional[str] = None, username: str = Depends(get_
                     .execute()
             
             if response.data:
-                # Update in-memory cache
                 messages_store.clear()
                 messages_store.extend(response.data)
                 return {"messages": response.data}
         except Exception as e:
             print(f"Supabase fetch error: {e}")
-            # Fall through to in-memory
     
     # Fallback to in-memory storage
     if since:
@@ -318,22 +311,18 @@ async def update_message(
     username: str = Depends(get_current_user)
 ):
     """Edit een bericht (alleen eigen berichten)"""
-    # Find message
     message = next((m for m in messages_store if m["id"] == message_id), None)
     
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    # Check ownership
     if message["username"] != username:
         raise HTTPException(status_code=403, detail="You can only edit your own messages")
     
-    # Update message
     message["content"] = update.content.strip()
     message["edited"] = True
     message["edited_at"] = datetime.now().isoformat()
     
-    # Update in Supabase if available
     if supabase:
         try:
             supabase.table("messages")\
@@ -352,20 +341,16 @@ async def update_message(
 @app.delete("/api/messages/{message_id}")
 async def delete_message(message_id: str, username: str = Depends(get_current_user)):
     """Delete een bericht (alleen eigen berichten)"""
-    # Find message
     message = next((m for m in messages_store if m["id"] == message_id), None)
     
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     
-    # Check ownership
     if message["username"] != username:
         raise HTTPException(status_code=403, detail="You can only delete your own messages")
     
-    # Remove from store
     messages_store.remove(message)
     
-    # Delete from Supabase if available
     if supabase:
         try:
             supabase.table("messages").delete().eq("id", message_id).execute()
@@ -392,6 +377,3 @@ async def get_users(username: str = Depends(get_current_user)):
             unique_users.append(user)
     
     return {"users": unique_users}
-
-# Vercel handler met Mangum
-handler = Mangum(app)
