@@ -173,6 +173,61 @@ body {
     font-weight: 700;
 }
 
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.5rem;
+    border-radius: 12px;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.auth-tab.active {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+}
+
+.auth-tab:hover:not(.active) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.auth-form {
+    display: none;
+}
+
+.auth-form.active {
+    display: block;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.error-message {
+    color: #ff6b6b;
+    font-size: 0.9rem;
+    margin: -0.5rem 0 1rem 0;
+    min-height: 1.2rem;
+}
+
+.password-hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: -0.5rem 0 1rem 0.25rem;
+}
+
 .input-group {
     position: relative;
     margin-bottom: 1.5rem;
@@ -211,6 +266,7 @@ body {
     pointer-events: none;
     transition: all 0.3s ease;
     transform-origin: left;
+    background: transparent;
 }
 
 .btn-primary {
@@ -547,29 +603,231 @@ body {
     margin-top: 0.5rem;
 }
 
-/* Responsive */
+/* Mobile Optimizations */
 @media (max-width: 768px) {
+    body {
+        font-size: 16px; /* Prevent zoom on focus */
+    }
+    
     .logo-text {
-        font-size: 3rem;
+        font-size: 2.5rem;
+    }
+    
+    .tagline {
+        font-size: 1rem;
+    }
+    
+    .login-container {
+        padding: 1rem;
+        max-width: 100%;
+    }
+    
+    .login-card {
+        padding: 1.5rem;
+        border-radius: 20px;
+    }
+    
+    .login-card h2 {
+        font-size: 1.5rem;
     }
     
     .chat-header {
-        padding: 1rem 1.5rem;
+        padding: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
     
     .chat-title {
-        font-size: 1.4rem;
+        font-size: 1.3rem;
+    }
+    
+    .header-left {
+        gap: 1rem;
+    }
+    
+    .online-indicator {
+        font-size: 0.85rem;
+    }
+    
+    .user-name {
+        display: none;
+    }
+    
+    .user-badge {
+        padding: 0.4rem 0.6rem;
+        gap: 0.5rem;
+    }
+    
+    .user-initial {
+        width: 28px;
+        height: 28px;
+        font-size: 0.85rem;
+    }
+    
+    .btn-icon {
+        width: 36px;
+        height: 36px;
     }
     
     .messages-wrapper {
         padding: 1rem;
     }
     
-    .input-area {
-        padding: 1rem 1.5rem;
+    .message {
+        gap: 0.75rem;
+        margin-bottom: 1rem;
     }
     
-    .user-name {
-        display: none;
+    .message-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 0.85rem;
+    }
+    
+    .message-username {
+        font-size: 0.9rem;
+    }
+    
+    .message-time {
+        font-size: 0.75rem;
+    }
+    
+    .message-text {
+        padding: 0.65rem 0.9rem;
+        font-size: 0.95rem;
+    }
+    
+    .input-area {
+        padding: 1rem;
+    }
+    
+    .input-wrapper {
+        gap: 0.5rem;
+    }
+    
+    #messageInput {
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 0.9rem 1rem;
+        min-height: 46px; /* Better touch target */
+    }
+    
+    .btn-send {
+        width: 46px;
+        height: 46px;
+        min-width: 46px; /* Ensure minimum touch target */
+        border-radius: 12px;
+    }
+    
+    /* Better input fields for mobile */
+    .input-group input {
+        font-size: 16px; /* Prevent iOS zoom */
+        padding: 0.9rem 1rem;
+        min-height: 46px;
+    }
+    
+    .btn-primary {
+        padding: 0.9rem 1.25rem;
+        font-size: 1rem;
+        min-height: 48px; /* Better touch target */
+    }
+    
+    .auth-tab {
+        padding: 0.7rem 0.8rem;
+        font-size: 0.9rem;
+        min-height: 44px;
+    }
+    
+    /* Improve welcome message on mobile */
+    .welcome-message {
+        padding: 2rem 1rem;
+    }
+    
+    .welcome-icon {
+        font-size: 3rem;
+    }
+    
+    .welcome-message h3 {
+        font-size: 1.4rem;
+    }
+}
+
+/* Extra small phones */
+@media (max-width: 380px) {
+    .logo-text {
+        font-size: 2rem;
+    }
+    
+    .login-card {
+        padding: 1.25rem;
+    }
+    
+    .chat-title {
+        font-size: 1.1rem;
+    }
+    
+    .online-indicator {
+        font-size: 0.8rem;
+    }
+    
+    .message-text {
+        font-size: 0.9rem;
+    }
+}
+
+/* Landscape mode on mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .messages-wrapper {
+        padding: 0.75rem;
+    }
+    
+    .input-area {
+        padding: 0.75rem;
+    }
+    
+    .logo-area {
+        margin-bottom: 1.5rem;
+    }
+    
+    .logo-text {
+        font-size: 2rem;
+    }
+}
+
+/* Touch improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Better touch feedback */
+    .btn-primary:active,
+    .btn-send:active,
+    .btn-icon:active,
+    .auth-tab:active {
+        transform: scale(0.97);
+    }
+    
+    /* Remove hover states on touch devices */
+    .btn-primary:hover,
+    .btn-send:hover,
+    .btn-icon:hover {
+        transform: none;
+    }
+    
+    .btn-primary:active {
+        transform: scale(0.97);
+    }
+    
+    .btn-send:active {
+        transform: scale(0.95);
+    }
+}
+
+/* PWA specific - hide address bar */
+@media (display-mode: standalone) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .chat-container {
+        height: 100vh;
+        height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     }
 }

@@ -1,11 +1,12 @@
 // API Configuration
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000'
-    : ''; // Vercel will use relative paths
+    : '';
 
 // State
 let currentUser = null;
 let userColor = null;
+let authToken = null;
 let pollingInterval = null;
 let lastTimestamp = null;
 
@@ -13,7 +14,7 @@ let lastTimestamp = null;
 const loginScreen = document.getElementById('loginScreen');
 const chatScreen = document.getElementById('chatScreen');
 const loginForm = document.getElementById('loginForm');
-const usernameInput = document.getElementById('usernameInput');
+const registerForm = document.getElementById('registerForm');
 const messageForm = document.getElementById('messageForm');
 const messageInput = document.getElementById('messageInput');
 const messagesContainer = document.getElementById('messagesContainer');
@@ -30,11 +31,43 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
+    // Auth tabs
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.addEventListener('click', handleTabSwitch);
+    });
+    
+    // Forms
     loginForm.addEventListener('submit', handleLogin);
+    registerForm.addEventListener('submit', handleRegister);
     messageForm.addEventListener('submit', handleSendMessage);
     logoutBtn.addEventListener('click', handleLogout);
+    
+    // Message input
     messageInput.addEventListener('input', handleMessageInput);
     messageInput.addEventListener('keydown', handleKeyDown);
+}
+
+function handleTabSwitch(e) {
+    const targetTab = e.target.dataset.tab;
+    
+    // Update tabs
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    e.target.classList.add('active');
+    
+    // Update forms
+    document.querySelectorAll('.auth-form').forEach(form => {
+        form.classList.remove('active');
+    });
+    
+    if (targetTab === 'login') {
+        loginForm.classList.add('active');
+        clearError('loginError');
+    } else {
+        registerForm.classList.add('active');
+        clearError('registerError');
+    }
 }
 
 function handleKeyDown(e) {
@@ -57,52 +90,131 @@ function handleMessageInput(e) {
 }
 
 function checkExistingSession() {
-    const savedUser = localStorage.getItem('flowchat_user');
-    const savedColor = localStorage.getItem('flowchat_color');
+    const savedToken = localStorage.getItem('flowchat_token');
     
-    if (savedUser && savedColor) {
-        currentUser = savedUser;
-        userColor = savedColor;
+    if (savedToken) {
+        authToken = savedToken;
+        validateToken();
+    }
+}
+
+async function validateToken() {
+    try {
+        const response = await fetch(`${API_URL}/api/me`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            currentUser = data.username;
+            userColor = data.color;
+            showChatScreen();
+        } else {
+            // Token invalid, clear it
+            localStorage.removeItem('flowchat_token');
+            authToken = null;
+        }
+    } catch (error) {
+        console.error('Token validation error:', error);
+        localStorage.removeItem('flowchat_token');
+        authToken = null;
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    clearError('registerError');
+    
+    const username = document.getElementById('registerUsername').value.trim();
+    const email = document.getElementById('registerEmail').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    
+    if (!username || username.length < 3) {
+        showError('registerError', 'Gebruikersnaam moet minimaal 3 karakters zijn');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showError('registerError', 'Wachtwoord moet minimaal 6 karakters zijn');
+        return;
+    }
+    
+    try {
+        const payload = { username, password };
+        if (email) {
+            payload.email = email;
+        }
+        
+        const response = await fetch(`${API_URL}/api/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.detail || 'Registratie mislukt');
+        }
+        
+        currentUser = data.username;
+        userColor = data.color;
+        authToken = data.token;
+        
+        // Save token
+        localStorage.setItem('flowchat_token', authToken);
+        
         showChatScreen();
+        
+    } catch (error) {
+        console.error('Register error:', error);
+        showError('registerError', error.message || 'Er ging iets mis bij het registreren');
     }
 }
 
 async function handleLogin(e) {
     e.preventDefault();
+    clearError('loginError');
     
-    const username = usernameInput.value.trim();
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
     
-    if (!username) {
-        showError('Voer een gebruikersnaam in');
+    if (!username || !password) {
+        showError('loginError', 'Vul alle velden in');
         return;
     }
     
     try {
-        const response = await fetch(`${API_URL}/api/join`, {
+        const response = await fetch(`${API_URL}/api/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username })
+            body: JSON.stringify({ username, password })
         });
         
+        const data = await response.json();
+        
         if (!response.ok) {
-            throw new Error('Login mislukt');
+            throw new Error(data.detail || 'Login mislukt');
         }
         
-        const data = await response.json();
         currentUser = data.username;
         userColor = data.color;
+        authToken = data.token;
         
-        // Save to localStorage
-        localStorage.setItem('flowchat_user', currentUser);
-        localStorage.setItem('flowchat_color', userColor);
+        // Save token
+        localStorage.setItem('flowchat_token', authToken);
         
         showChatScreen();
         
     } catch (error) {
         console.error('Login error:', error);
-        showError('Er ging iets mis bij het inloggen');
+        showError('loginError', error.message || 'Ongeldige gebruikersnaam of wachtwoord');
     }
 }
 
@@ -142,14 +254,17 @@ async function handleSendMessage(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({
-                content,
-                username: currentUser
-            })
+            body: JSON.stringify({ content })
         });
         
         if (!response.ok) {
+            if (response.status === 401) {
+                // Token expired, logout
+                handleLogout();
+                return;
+            }
             throw new Error('Bericht versturen mislukt');
         }
         
@@ -172,16 +287,23 @@ async function handleSendMessage(e) {
         
     } catch (error) {
         console.error('Send message error:', error);
-        showError('Kon bericht niet versturen');
         sendBtn.disabled = false;
     }
 }
 
 async function loadMessages() {
     try {
-        const response = await fetch(`${API_URL}/api/messages`);
+        const response = await fetch(`${API_URL}/api/messages`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
         
         if (!response.ok) {
+            if (response.status === 401) {
+                handleLogout();
+                return;
+            }
             throw new Error('Berichten laden mislukt');
         }
         
@@ -219,9 +341,19 @@ function startPolling() {
         }
         
         try {
-            const response = await fetch(`${API_URL}/api/messages?since=${encodeURIComponent(lastTimestamp)}`);
+            const response = await fetch(
+                `${API_URL}/api/messages?since=${encodeURIComponent(lastTimestamp)}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                }
+            );
             
             if (!response.ok) {
+                if (response.status === 401) {
+                    handleLogout();
+                }
                 return;
             }
             
@@ -254,7 +386,11 @@ function startPolling() {
 
 async function loadUserCount() {
     try {
-        const response = await fetch(`${API_URL}/api/users`);
+        const response = await fetch(`${API_URL}/api/users`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
         
         if (response.ok) {
             const data = await response.json();
@@ -344,16 +480,27 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function handleLogout() {
+async function handleLogout() {
+    try {
+        await fetch(`${API_URL}/api/logout`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+    
     if (pollingInterval) {
         clearInterval(pollingInterval);
     }
     
-    localStorage.removeItem('flowchat_user');
-    localStorage.removeItem('flowchat_color');
+    localStorage.removeItem('flowchat_token');
     
     currentUser = null;
     userColor = null;
+    authToken = null;
     lastTimestamp = null;
     
     messagesContainer.innerHTML = `
@@ -367,12 +514,21 @@ function handleLogout() {
     chatScreen.classList.remove('active');
     loginScreen.classList.add('active');
     
-    usernameInput.value = '';
+    // Reset forms
+    loginForm.reset();
+    registerForm.reset();
+    clearError('loginError');
+    clearError('registerError');
 }
 
-function showError(message) {
-    // Simple error display - you can enhance this
-    alert(message);
+function showError(elementId, message) {
+    const errorEl = document.getElementById(elementId);
+    errorEl.textContent = message;
+}
+
+function clearError(elementId) {
+    const errorEl = document.getElementById(elementId);
+    errorEl.textContent = '';
 }
 
 // Handle page visibility changes
@@ -381,7 +537,61 @@ document.addEventListener('visibilitychange', () => {
         if (pollingInterval) {
             clearInterval(pollingInterval);
         }
-    } else if (currentUser) {
+    } else if (currentUser && authToken) {
         startPolling();
+        // Reload messages when coming back to app
+        loadMessages();
     }
 });
+
+// Mobile: Pull to refresh
+let touchStartY = 0;
+let touchEndY = 0;
+
+messagesContainer.parentElement.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+messagesContainer.parentElement.addEventListener('touchmove', (e) => {
+    touchEndY = e.touches[0].clientY;
+    const scrollTop = messagesContainer.parentElement.scrollTop;
+    
+    // Only trigger if at top and pulling down
+    if (scrollTop === 0 && touchEndY > touchStartY + 50) {
+        // Show refresh indicator (you can add UI for this)
+    }
+}, { passive: true });
+
+messagesContainer.parentElement.addEventListener('touchend', async () => {
+    const scrollTop = messagesContainer.parentElement.scrollTop;
+    
+    if (scrollTop === 0 && touchEndY > touchStartY + 100) {
+        // Pull to refresh triggered
+        await loadMessages();
+        touchStartY = 0;
+        touchEndY = 0;
+    }
+}, { passive: true });
+
+// Prevent zoom on double-tap for message input
+messageInput.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    messageInput.focus();
+}, { passive: false });
+
+// Auto-hide keyboard on send
+messageForm.addEventListener('submit', () => {
+    if (window.innerWidth <= 768) {
+        messageInput.blur();
+        setTimeout(() => messageInput.focus(), 100);
+    }
+});
+
+// Service Worker for PWA (optional)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {
+            // Service worker not available, that's ok
+        });
+    });
+}
