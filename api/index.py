@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, validator
 from datetime import datetime, timedelta
 from typing import Optional
 import uuid
 import os
 import hashlib
 import secrets
+import re
 
 app = FastAPI()
 
@@ -41,7 +42,18 @@ security = HTTPBearer(auto_error=False)
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    email: EmailStr
+    email: str
+    
+    @validator('email')
+    def validate_email(cls, v):
+        # Simple email validation
+        if not v or '@' not in v:
+            raise ValueError('Email must contain @')
+        return v.lower().strip()
+    
+    @validator('username')
+    def validate_username(cls, v):
+        return v.strip()
 
 class LoginRequest(BaseModel):
     username: str
@@ -129,7 +141,7 @@ async def root():
 @app.post("/api/register")
 async def register(request: RegisterRequest):
     """Register new user"""
-    username = request.username.strip()
+    username = request.username
     password = request.password
     email = request.email
     
